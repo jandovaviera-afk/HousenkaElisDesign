@@ -1,0 +1,729 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Jak dlouho zvládneš nenarazit?</title>
+
+  <style>
+    :root{
+      --bg:#fbfbf7;
+      --card:#ffffff;
+      --border:#bfe3ff;
+      --text:#1f2937;
+      --muted:#6b7280;
+      --shadow: 0 10px 30px rgba(0,0,0,.08);
+
+      --food-yellow:#ffd84a;
+      --food-pink:#f6a5c0;
+      --food-navy:#0d2a5a;
+    }
+
+    *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+    html,body{
+      height:100%;
+      margin:0;
+      font-family: ui-rounded, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background:var(--bg);
+      color:var(--text);
+      overscroll-behavior: none;        /* zabrání “gumě” */
+      touch-action: manipulation;       /* méně nechtěných gest */
+    }
+
+    .wrap{ min-height:100%; display:flex; align-items:center; justify-content:center; padding:18px; }
+    .card{
+      width:min(520px, 100%);
+      background:var(--card);
+      border-radius:24px;
+      box-shadow:var(--shadow);
+      padding:16px 16px 14px;
+    }
+
+    header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:10px;
+    }
+    .title{ line-height:1.05; }
+    .title h1{ margin:0; font-size:16px; letter-spacing:.2px; }
+    .title p{ margin:6px 0 0; font-size:12px; color:var(--muted); }
+
+    .hud{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      align-items:flex-end;
+      font-size:12px;
+      color:var(--muted);
+      white-space:nowrap;
+    }
+    .hud strong{ color:var(--text); font-weight:700; }
+
+    .board{
+      border:18px solid var(--border);
+      border-radius:24px;
+      padding:12px;
+      background:linear-gradient(180deg, rgba(191,227,255,.25), rgba(191,227,255,.0));
+      touch-action:none;  /* důležité pro swipe */
+      user-select:none;
+    }
+    canvas{
+      width:100%;
+      height:auto;
+      display:block;
+      border-radius:14px;
+      background:radial-gradient(circle at 30% 20%, rgba(255,216,74,.10), rgba(255,255,255,0) 45%),
+                 #ffffff;
+    }
+
+    .controls{
+      margin-top:12px;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .btns{ display:flex; gap:8px; flex-wrap:wrap; }
+    button{
+      border:1px solid rgba(0,0,0,.08);
+      background:#fff;
+      border-radius:999px;
+      padding:10px 12px;
+      font-size:13px;
+      color:var(--text);
+      box-shadow: 0 6px 18px rgba(0,0,0,.06);
+      cursor:pointer;
+      touch-action: manipulation;
+    }
+    button:active{ transform: translateY(1px); }
+
+    .overlay{ position:relative; }
+
+    .modal{
+      position:absolute;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      pointer-events:none;
+    }
+    .panel{
+      pointer-events:auto;
+      width:min(420px, 100%);
+      background:rgba(255,255,255,.94);
+      backdrop-filter: blur(8px);
+      border:1px solid rgba(0,0,0,.08);
+      border-radius:18px;
+      box-shadow:var(--shadow);
+      padding:16px;
+      text-align:center;
+    }
+    .panel h2{ margin:2px 0 8px; font-size:18px; font-weight:400; } /* regular */
+    .panel p{ margin:0 0 12px; font-size:13px; color:var(--muted); line-height:1.35; }
+    .panel .row{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; align-items:center; }
+
+    /* žluté kolečko se šipkou */
+    .yellowArrow{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:44px;
+      height:44px;
+      border-radius:999px;
+      border:1px solid rgba(0,0,0,.08);
+      background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.9), rgba(255,255,255,0) 45%),
+                  var(--food-yellow);
+      box-shadow: 0 6px 18px rgba(0,0,0,.10);
+      text-decoration:none;
+      color:#1f2937;
+      font-size:18px;
+      line-height:1;
+      touch-action: manipulation;
+    }
+    .yellowArrow:active{ transform: translateY(1px); }
+
+    .toast{
+      position:absolute;
+      left:50%;
+      bottom:14px;
+      transform:translateX(-50%);
+      background:rgba(31,41,55,.92);
+      color:#fff;
+      padding:8px 12px;
+      border-radius:999px;
+      font-size:12px;
+      opacity:0;
+      transition:opacity .2s ease;
+      pointer-events:none;
+      white-space:nowrap;
+    }
+    .toast.show{ opacity:1; }
+
+    /* ====== MOBILNÍ OVLADAČ (D-PAD) ====== */
+    .dpad{
+      margin-top:12px;
+      display:grid;
+      grid-template-columns: 56px 56px 56px;
+      grid-template-rows: 56px 56px 56px;
+      gap:10px;
+      justify-content:center;
+      align-items:center;
+      user-select:none;
+      touch-action:none;
+    }
+    .dpad button{
+      width:56px;
+      height:56px;
+      border-radius:18px;
+      font-size:18px;
+      padding:0;
+    }
+    .dpad .empty{ visibility:hidden; }
+
+    @media (min-width: 521px){
+      /* na desktopu je to spíš bonus – trochu menší */
+      .dpad{ grid-template-columns: 52px 52px 52px; grid-template-rows: 52px 52px 52px; }
+      .dpad button{ width:52px; height:52px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="card">
+      <header>
+        <div class="title">
+          <h1>Jak dlouho zvládneš nenarazit?</h1>
+          <p>Radost nemá věk</p>
+        </div>
+        <div class="hud">
+          <div>Skóre: <strong id="score">0</strong></div>
+          <div>Rekord: <strong id="best">0</strong></div>
+        </div>
+      </header>
+
+      <div class="overlay">
+        <div class="board" id="board">
+          <canvas id="c" width="420" height="420"></canvas>
+        </div>
+
+        <div class="modal" id="modal">
+          <div class="panel">
+            <h2 id="modalTitle">Jste připravení?</h2>
+            <p id="modalText">Hups do dětství!</p>
+            <div class="row" id="modalRow">
+              <button id="btnStart">Start</button>
+              <button id="btnRestart">Restart</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="toast" id="toast">Go!</div>
+      </div>
+
+      <!-- MOBILNÍ ŠIPKY (fungují i bez swipu) -->
+      <div class="dpad" aria-label="Ovládání směru">
+        <span class="empty">•</span>
+        <button id="btnUp"   aria-label="Nahoru">▲</button>
+        <span class="empty">•</span>
+
+        <button id="btnLeft" aria-label="Vlevo">◀</button>
+        <button id="btnDown" aria-label="Dolů">▼</button>
+        <button id="btnRight" aria-label="Vpravo">▶</button>
+
+        <span class="empty">•</span>
+        <span class="empty">•</span>
+        <span class="empty">•</span>
+      </div>
+
+      <div class="controls">
+        <div class="btns">
+          <button id="btnRestart2">Restart</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // ====== Canvas sizing ======
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+
+  const boardEl = document.getElementById('board');
+  function fitCanvas(){
+    const w = Math.min(520, boardEl.clientWidth - 24);
+    const size = Math.max(280, Math.floor(w));
+    canvas.style.width = size + 'px';
+    canvas.style.height = size + 'px';
+  }
+  window.addEventListener('resize', fitCanvas);
+  fitCanvas();
+
+  // zabrání scrollu stránky při hraní (iOS/Android)
+  // (nechává “běžné klikání” fungovat)
+  document.addEventListener('touchmove', (e) => {
+    if (e.target.closest('#board') || e.target.closest('.dpad')) e.preventDefault();
+  }, { passive: false });
+
+  // ====== UI ======
+  const scoreEl = document.getElementById('score');
+  const bestEl  = document.getElementById('best');
+  const toastEl = document.getElementById('toast');
+
+  const modal = document.getElementById('modal');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalText  = document.getElementById('modalText');
+  const modalRow   = document.getElementById('modalRow');
+
+  const btnStart   = document.getElementById('btnStart');
+  const btnRestart = document.getElementById('btnRestart');
+  const btnRestart2= document.getElementById('btnRestart2');
+
+  // mobilní šipky
+  const btnUp    = document.getElementById('btnUp');
+  const btnDown  = document.getElementById('btnDown');
+  const btnLeft  = document.getElementById('btnLeft');
+  const btnRight = document.getElementById('btnRight');
+
+  function showToast(text, ms=900){
+    toastEl.textContent = text;
+    toastEl.classList.add('show');
+    setTimeout(() => toastEl.classList.remove('show'), ms);
+  }
+
+  // ====== Game constants ======
+  const GRID = 21;
+  const CELL = canvas.width / GRID;
+
+  // rychlost + zrychlování po jídle
+  const TICK_START_MS = 185;
+  const SPEEDUP_PER_EAT = 4;
+  const TICK_MIN_MS = 85;
+  let tickMs = TICK_START_MS;
+
+  const WRAP = true;
+
+  // ====== Food colors ======
+  const FOOD_COLORS = [
+    { key: "yellow", fill: "rgba(255,216,74,0.98)", glow: "rgba(255,216,74,0.18)", spark: "rgba(255,216,74,0.95)" },
+    { key: "pink",   fill: "rgba(246,165,192,0.98)", glow: "rgba(246,165,192,0.18)", spark: "rgba(246,165,192,0.95)" },
+    { key: "navy",   fill: "rgba(13,42,90,0.98)",    glow: "rgba(13,42,90,0.16)",   spark: "rgba(13,42,90,0.95)"  },
+  ];
+
+  // ====== State ======
+  let running = false;
+
+  let score = 0;
+  let best  = Number(localStorage.getItem('klias_snake_best') || 0);
+  bestEl.textContent = best;
+
+  let snake = [];
+  let dir = {x:1,y:0};
+  let nextDir = {x:1,y:0};
+
+  let food = {x:10,y:10, theme: FOOD_COLORS[0]};
+  let foodEatAnim = 0;
+  let foodGhost = [];
+  let particles = [];
+
+  // smooth render
+  let prevSnake = [];
+  let acc = 0;
+  let lastTs = performance.now();
+
+  // ====== Helpers ======
+  function randInt(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+  function samePos(a,b){ return a.x===b.x && a.y===b.y; }
+
+  function inSnake(pos){
+    return snake.some(s => s.x===pos.x && s.y===pos.y);
+  }
+
+  function wrapPos(p){
+    if(!WRAP) return p;
+    let x=p.x, y=p.y;
+    if(x<0) x=GRID-1; if(x>=GRID) x=0;
+    if(y<0) y=GRID-1; if(y>=GRID) y=0;
+    return {x,y};
+  }
+
+  function pickFoodTheme(){
+    return FOOD_COLORS[randInt(0, FOOD_COLORS.length-1)];
+  }
+
+  function placeFood(){
+    let p;
+    do{
+      p = {x: randInt(0,GRID-1), y: randInt(0,GRID-1)};
+    }while(inSnake(p));
+    food = { ...p, theme: pickFoodTheme() };
+  }
+
+  function spawnSparks(gridX, gridY, theme, count=10){
+    const cx = (gridX + 0.5) * CELL;
+    const cy = (gridY + 0.5) * CELL;
+    for(let i=0;i<count;i++){
+      const a = Math.random()*Math.PI*2;
+      const sp = 40 + Math.random()*90;
+      particles.push({
+        x: cx, y: cy,
+        vx: Math.cos(a)*sp,
+        vy: Math.sin(a)*sp,
+        life: 0.35 + Math.random()*0.25,
+        theme
+      });
+    }
+  }
+
+  // ====== Core controls ======
+  function setDir(nx, ny){
+    // zákaz otočky o 180°
+    if(nx === -dir.x && ny === -dir.y) return;
+    nextDir = {x:nx, y:ny};
+  }
+
+  window.addEventListener('keydown', (e)=>{
+    const k = e.key.toLowerCase();
+    if(k === 'arrowup' || k==='w') setDir(0,-1);
+    if(k === 'arrowdown' || k==='s') setDir(0, 1);
+    if(k === 'arrowleft' || k==='a') setDir(-1,0);
+    if(k === 'arrowright' || k==='d') setDir(1,0);
+    if(k === 'r') start();
+  });
+
+  // Swipe (mobil)
+  let touchStart = null;
+  const SWIPE_MIN = 14;
+
+  boardEl.addEventListener('touchstart', (e)=>{
+    const t = e.changedTouches[0];
+    touchStart = {x:t.clientX, y:t.clientY};
+  }, {passive:true});
+
+  boardEl.addEventListener('touchmove', (e)=>{ e.preventDefault(); }, {passive:false});
+
+  boardEl.addEventListener('touchend', (e)=>{
+    if(!touchStart) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStart.x;
+    const dy = t.clientY - touchStart.y;
+    touchStart = null;
+
+    if(Math.abs(dx) < SWIPE_MIN && Math.abs(dy) < SWIPE_MIN) return;
+
+    if(Math.abs(dx) > Math.abs(dy)){
+      setDir(dx>0 ? 1 : -1, 0);
+    }else{
+      setDir(0, dy>0 ? 1 : -1);
+    }
+  }, {passive:true});
+
+  // Mobilní D-pad (lepší než swipe pro některé telefony)
+  function bindPad(btn, nx, ny){
+    const handler = (e) => { e.preventDefault(); setDir(nx, ny); };
+    btn.addEventListener('pointerdown', handler, {passive:false});
+    btn.addEventListener('touchstart', handler, {passive:false});
+    btn.addEventListener('mousedown', handler);
+  }
+  bindPad(btnUp, 0, -1);
+  bindPad(btnDown, 0, 1);
+  bindPad(btnLeft, -1, 0);
+  bindPad(btnRight, 1, 0);
+
+  // ====== Start/Reset ======
+  function reset(){
+    score = 0;
+    scoreEl.textContent = score;
+
+    tickMs = TICK_START_MS;
+
+    dir = {x:1,y:0};
+    nextDir = {x:1,y:0};
+
+    snake = [
+      {x:9,y:10},
+      {x:8,y:10},
+      {x:7,y:10},
+      {x:6,y:10},
+    ];
+    prevSnake = snake.map(p=>({...p}));
+
+    particles = [];
+    foodGhost = [];
+    foodEatAnim = 0;
+
+    placeFood();
+
+    acc = 0;
+    lastTs = performance.now();
+  }
+
+  function openIntro(){
+    modal.style.display = 'flex';
+    modalTitle.textContent = "Jste připravení?";
+    modalText.textContent = "Hups do dětství!";
+    modalRow.innerHTML = `
+      <button id="btnStartInner">Start</button>
+      <button id="btnRestartInner">Restart</button>
+    `;
+    modalRow.querySelector('#btnStartInner').addEventListener('click', start);
+    modalRow.querySelector('#btnRestartInner').addEventListener('click', start);
+  }
+
+  function start(){
+    reset();
+    running = true;
+    modal.style.display = 'none';
+    showToast("Go!");
+  }
+
+  // upravené game over okno
+  function selfCrashModal(){
+    running = false;
+    modal.style.display = 'flex';
+
+    modalTitle.textContent = "Ups! Nevadí, zkus to znovu.";
+    modalText.innerHTML = `<strong>A pokud chceš smysluplně zabavit svoje děti, mrkni tady</strong>`;
+
+    modalRow.innerHTML = `
+      <button id="btnAgain">Zkusit znovu</button>
+      <a class="yellowArrow" href="https://www.elisdesign.cz" target="_blank" rel="noopener" aria-label="Otevřít elisdesign.cz">→</a>
+    `;
+    modalRow.querySelector('#btnAgain').addEventListener('click', start);
+  }
+
+  // ====== Tick logic ======
+  function tick(){
+    dir = {...nextDir};
+    prevSnake = snake.map(p=>({...p}));
+
+    const head = snake[0];
+    const nh = wrapPos({x: head.x + dir.x, y: head.y + dir.y});
+
+    const hitSelf = snake.some((s, i) => i>0 && s.x===nh.x && s.y===nh.y);
+    if(hitSelf){
+      return selfCrashModal();
+    }
+
+    snake.unshift(nh);
+
+    if(samePos(nh, food)){
+      score += 1;
+      scoreEl.textContent = score;
+
+      if(score > best){
+        best = score;
+        bestEl.textContent = best;
+        localStorage.setItem('klias_snake_best', String(best));
+      }
+
+      // zrychlení po snězení
+      tickMs = Math.max(TICK_MIN_MS, tickMs - SPEEDUP_PER_EAT);
+
+      foodEatAnim = 1;
+      foodGhost.push({x:food.x, y:food.y, life: 0.35, theme: food.theme});
+      spawnSparks(food.x, food.y, food.theme, 12);
+
+      placeFood();
+    } else {
+      snake.pop();
+    }
+  }
+
+  function update(dt){
+    for(let i=particles.length-1;i>=0;i--){
+      const p = particles[i];
+      p.life -= dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vx *= Math.pow(0.001, dt);
+      p.vy *= Math.pow(0.001, dt);
+      if(p.life <= 0) particles.splice(i,1);
+    }
+
+    for(let i=foodGhost.length-1;i>=0;i--){
+      const g = foodGhost[i];
+      g.life -= dt;
+      if(g.life <= 0) foodGhost.splice(i,1);
+    }
+
+    if(foodEatAnim > 0){
+      foodEatAnim -= dt * 3.5;
+      if(foodEatAnim < 0) foodEatAnim = 0;
+    }
+  }
+
+  function draw(alpha){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    for(const g of foodGhost){
+      const cx = (g.x+0.5)*CELL, cy = (g.y+0.5)*CELL;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, g.life/0.35) * 0.35;
+      ctx.beginPath();
+      ctx.arc(cx, cy, CELL*0.42, 0, Math.PI*2);
+      ctx.fillStyle = g.theme.fill.replace("0.98", "0.55");
+      ctx.fill();
+      ctx.restore();
+    }
+
+    drawFood(food.x, food.y, foodEatAnim, food.theme);
+
+    for(const p of particles){
+      const a = Math.max(0, Math.min(1, p.life / 0.5));
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 2.1, 0, Math.PI*2);
+      ctx.fillStyle = p.theme.spark;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    for(let i=0;i<snake.length;i++){
+      const cur = snake[i];
+      const prev = prevSnake[i] || cur;
+
+      let x = (prev.x + (cur.x - prev.x)*alpha);
+      let y = (prev.y + (cur.y - prev.y)*alpha);
+
+      const dx = cur.x - prev.x;
+      const dy = cur.y - prev.y;
+      if(WRAP){
+        if(dx >  1) x = (prev.x + (cur.x - GRID - prev.x)*alpha);
+        if(dx < -1) x = (prev.x + (cur.x + GRID - prev.x)*alpha);
+        if(dy >  1) y = (prev.y + (cur.y - GRID - prev.y)*alpha);
+        if(dy < -1) y = (prev.y + (cur.y + GRID - prev.y)*alpha);
+      }
+
+      drawSegment(x, y, i===0);
+    }
+  }
+
+  function drawSegment(gx, gy, isHead){
+    const cx = (gx + 0.5) * CELL;
+    const cy = (gy + 0.5) * CELL;
+    const r  = CELL * (isHead ? 0.46 : 0.44);
+
+    ctx.save();
+
+    ctx.beginPath();
+    ctx.arc(cx + 1.6, cy + 2.2, r, 0, Math.PI*2);
+    ctx.fillStyle = "rgba(0,0,0,0.10)";
+    ctx.fill();
+
+    const g = ctx.createRadialGradient(cx - r*0.35, cy - r*0.35, r*0.2, cx, cy, r);
+    g.addColorStop(0, "rgba(255,255,255,0.75)");
+    g.addColorStop(1, "rgba(210, 235, 222, 0.98)");
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI*2);
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    ctx.lineWidth = Math.max(1, CELL*0.06);
+    ctx.strokeStyle = "rgba(31,41,55,0.06)";
+    ctx.stroke();
+
+    if(isHead){
+      const ex = cx + (dir.x* r*0.12);
+      const ey = cy + (dir.y* r*0.12);
+      const ox = (dir.y)* r*0.18;
+      const oy = (-dir.x)* r*0.18;
+
+      ctx.beginPath();
+      ctx.arc(ex + ox, ey + oy, 2.1, 0, Math.PI*2);
+      ctx.arc(ex - ox, ey - oy, 2.1, 0, Math.PI*2);
+      ctx.fillStyle = "rgba(31,41,55,0.75)";
+      ctx.fill();
+
+      ctx.beginPath();
+      const mx = cx + dir.x * r*0.18;
+      const my = cy + dir.y * r*0.18;
+      ctx.strokeStyle = "rgba(31,41,55,0.35)";
+      ctx.lineWidth = 2;
+      ctx.arc(mx, my, r*0.18, Math.PI*0.15, Math.PI*0.85);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  function drawFood(x,y, anim, theme){
+    const cx = (x+0.5)*CELL, cy = (y+0.5)*CELL;
+    const baseR = CELL*0.38;
+    const r = baseR * (1 + anim*0.25);
+
+    ctx.save();
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, r*1.55, 0, Math.PI*2);
+    ctx.fillStyle = theme.glow;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(cx+1.2, cy+1.8, r, 0, Math.PI*2);
+    ctx.fillStyle = "rgba(0,0,0,0.10)";
+    ctx.fill();
+
+    const grad = ctx.createRadialGradient(cx - r*0.35, cy - r*0.35, r*0.2, cx, cy, r);
+    grad.addColorStop(0, "rgba(255,255,255,0.85)");
+    grad.addColorStop(1, theme.fill);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI*2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.lineWidth = Math.max(1, CELL*0.06);
+    ctx.strokeStyle = "rgba(31,41,55,0.10)";
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(cx + r*0.25, cy - r*0.15, 2.2, 0, Math.PI*2);
+    ctx.fillStyle = "rgba(255,255,255,0.30)";
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  // ====== Main loop ======
+  function loop(ts){
+    const dt = Math.min(0.05, (ts - lastTs)/1000);
+    lastTs = ts;
+
+    if(running){
+      acc += dt * 1000;
+
+      while(acc >= tickMs){
+        acc -= tickMs;
+        tick();
+      }
+
+      update(dt);
+      const alpha = Math.min(1, acc / tickMs);
+      draw(alpha);
+    } else {
+      update(dt);
+      draw(1);
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  // ====== init ======
+  btnStart.addEventListener('click', start);
+  btnRestart.addEventListener('click', start);
+  btnRestart2.addEventListener('click', start);
+
+  reset();
+  openIntro();
+  requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
